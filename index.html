@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SafeHer Route — Navigate Safely</title>
+  <meta name="description" content="Safety-focused navigation app that recommends safer routes using AI-powered danger scoring, crowd density analysis, and community reports." />
+  <meta name="theme-color" content="#0F0F1A" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- LANDING PAGE -->
+  <section id="landing" class="page active">
+    <div class="landing-bg">
+      <div class="landing-orb orb-1"></div>
+      <div class="landing-orb orb-2"></div>
+      <div class="landing-orb orb-3"></div>
+    </div>
+    <nav class="landing-nav">
+      <div class="logo">
+        <div class="logo-icon">🛡️</div>
+        <span class="logo-text">SafeHer</span>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="showPage('app')">Open App</button>
+    </nav>
+    <div class="landing-hero">
+      <div class="badge">🔒 AI-Powered Safety Navigation</div>
+      <h1>Navigate with <span class="gradient-text">Confidence</span></h1>
+      <p class="hero-sub">Safety-first routing powered by AI danger scoring, real-time crowd density analysis, and community intelligence. Never feel unsafe again.</p>
+      <div class="hero-btns">
+        <button class="btn btn-primary btn-lg" onclick="showPage('app')">
+          <span>Start Safe Navigation</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+        <button class="btn btn-glass btn-lg" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
+          <span>Learn More</span>
+        </button>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><span class="stat-num">7+</span><span class="stat-label">Safety Features</span></div>
+        <div class="stat"><span class="stat-num">AI</span><span class="stat-label">Risk Analysis</span></div>
+        <div class="stat"><span class="stat-num">24/7</span><span class="stat-label">Protection</span></div>
+      </div>
+    </div>
+    <div id="features" class="features-section">
+      <h2>Why <span class="gradient-text">SafeHer Route</span>?</h2>
+      <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon">🗺️</div><h3>Safe Route Prediction</h3><p>AI-scored routes based on safety data, not just distance</p></div>
+        <div class="feature-card"><div class="feature-icon">🚨</div><h3>Instant SOS</h3><p>One-tap emergency alert to all your trusted contacts</p></div>
+        <div class="feature-card"><div class="feature-icon">📍</div><h3>Live Location</h3><p>Share real-time location with family during travel</p></div>
+        <div class="feature-card"><div class="feature-icon">🔥</div><h3>Crowd Density</h3><p>Real-time heatmap showing crowded vs isolated areas</p></div>
+        <div class="feature-card"><div class="feature-icon">🧠</div><h3>AI Risk Score</h3><p>Predictive danger scoring for any location, any time</p></div>
+        <div class="feature-card"><div class="feature-icon">👥</div><h3>Community Intel</h3><p>User-reported unsafe zones keep everyone informed</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN APP -->
+  <section id="app" class="page">
+    <!-- Top Bar -->
+    <div class="app-topbar">
+      <div class="topbar-left">
+        <div class="logo-sm">🛡️</div>
+        <span class="app-title">SafeHer</span>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="heatmapToggle" title="Toggle Heatmap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12a4 4 0 0 0 8 0"/><circle cx="12" cy="12" r="2"/></svg>
+        </button>
+        <button class="icon-btn" id="layersToggle" title="Map Layers">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-container">
+      <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="Where do you want to go safely?" />
+      </div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Route Panel -->
+    <div id="routePanel" class="slide-panel hidden">
+      <div class="panel-handle"></div>
+      <div class="panel-header">
+        <h3>🗺️ Route Options</h3>
+        <button class="icon-btn" onclick="closeRoutePanel()">✕</button>
+      </div>
+      <div id="routeOrigin" class="route-input">
+        <span class="route-dot origin"></span>
+        <input type="text" id="originInput" placeholder="Your location (auto-detected)" />
+      </div>
+      <div id="routeDest" class="route-input">
+        <span class="route-dot dest"></span>
+        <input type="text" id="destInput" placeholder="Enter destination" />
+      </div>
+      <button class="btn btn-primary btn-full" id="findRouteBtn">Find Safest Route</button>
+      <div id="routeResults"></div>
+    </div>
+
+    <!-- Risk Analysis Panel -->
+    <div id="riskPanel" class="slide-panel hidden">
+      <div class="panel-handle"></div>
+      <div class="panel-header">
+        <h3>🧠 AI Risk Analysis</h3>
+        <button class="icon-btn" onclick="closeRiskPanel()">✕</button>
+      </div>
+      <div id="riskContent"></div>
+    </div>
+
+    <!-- SOS Button -->
+    <button class="sos-btn" id="sosBtn">
+      <span class="sos-pulse"></span>
+      <span class="sos-text">SOS</span>
+    </button>
+
+    <!-- SOS Overlay -->
+    <div id="sosOverlay" class="sos-overlay hidden">
+      <div class="sos-modal">
+        <div class="sos-countdown" id="sosCountdown">3</div>
+        <p class="sos-msg">Sending SOS alert in...</p>
+        <button class="btn btn-glass btn-lg" onclick="cancelSOS()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- SOS Active Banner -->
+    <div id="sosActive" class="sos-active hidden">
+      <div class="sos-active-pulse"></div>
+      <span>🚨 SOS Active — Contacts Alerted</span>
+      <button class="btn btn-sm btn-danger" onclick="deactivateSOS()">Stop</button>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-page="navigate" onclick="switchTab(this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        <span>Navigate</span>
+      </button>
+      <button class="nav-item" data-page="dashboard" onclick="switchTab(this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="contacts" onclick="switchTab(this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Contacts</span>
+      </button>
+      <button class="nav-item" data-page="community" onclick="switchTab(this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Reports</span>
+      </button>
+    </nav>
+
+    <!-- Tab Content Panels -->
+    <div id="dashboardPanel" class="tab-panel hidden"></div>
+    <div id="contactsPanel" class="tab-panel hidden"></div>
+    <div id="communityPanel" class="tab-panel hidden"></div>
+  </section>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
