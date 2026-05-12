@@ -5,8 +5,8 @@ import { analyzeRisk, scoreRoute } from './data/risk-model.js';
 import { initFirebase, saveToFirestore, getFromFirestore, getAuth, softDeleteDocument, logout } from './services/firebase.js';
 
 let map, heatLayer, dangerCircles = [], userMarker, sosTimer, sosActive = false, heatmapVisible = false;
-const contacts = JSON.parse(localStorage.getItem('sh_contacts') || '[]');
-const trips = JSON.parse(localStorage.getItem('sh_trips') || '[]');
+let contacts = JSON.parse(localStorage.getItem('sh_contacts') || '[]');
+let trips = JSON.parse(localStorage.getItem('sh_trips') || '[]');
 
 // ---- INIT ----
 window.addEventListener('DOMContentLoaded', () => {
