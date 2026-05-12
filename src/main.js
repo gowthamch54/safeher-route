@@ -222,7 +222,7 @@ function findRoutes() {
   const resultsDiv = document.getElementById('routeResults');
   resultsDiv.innerHTML = '<p style="text-align:center;color:var(--text2);padding:20px">🔍 Finding safest routes...</p>';
 
-  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destVal + ' Chennai')}&format=json&limit=1`)
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destVal + ', Tamil Nadu, India')}&format=json&limit=1`)
     .then(r => r.json())
     .then(data => {
       if (!data.length) { resultsDiv.innerHTML = '<p style="color:var(--danger)">Location not found. Try a landmark name.</p>'; return; }
