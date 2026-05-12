@@ -13,6 +13,47 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <!-- Recaptcha Container for Phone Auth -->
+  <div id="recaptcha-container"></div>
+
+  <!-- Auth Section -->
+  <section id="authSection" class="auth-section hidden">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="logo">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h2>Welcome to SafeHer</h2>
+        <p>Secure your journey.</p>
+      </div>
+      
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchAuthTab('email')">Email</button>
+        <button class="auth-tab" onclick="switchAuthTab('phone')">Phone OTP</button>
+      </div>
+
+      <!-- Email Login -->
+      <div id="authEmail" class="auth-form">
+        <input type="email" id="emailInput" placeholder="Email Address" class="auth-input">
+        <input type="password" id="passwordInput" placeholder="Password" class="auth-input">
+        <button class="btn btn-primary" onclick="handleEmailLogin()">Log In</button>
+        <button class="btn btn-glass" style="margin-top:10px" onclick="handleEmailSignup()">Create Account</button>
+      </div>
+
+      <!-- Phone Login -->
+      <div id="authPhone" class="auth-form hidden">
+        <div id="phoneStep1">
+          <input type="tel" id="phoneInput" placeholder="+91 9876543210" class="auth-input">
+          <button class="btn btn-primary" onclick="handleSendOTP()">Send OTP</button>
+        </div>
+        <div id="phoneStep2" class="hidden">
+          <input type="text" id="otpInput" placeholder="Enter 6-digit OTP" class="auth-input">
+          <button class="btn btn-primary" onclick="handleVerifyOTP()">Verify & Login</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- LANDING PAGE -->
   <section id="landing" class="page active">
     <div class="landing-bg">
@@ -22,10 +63,10 @@
     </div>
     <nav class="landing-nav">
       <div class="logo">
-        <div class="logo-icon">🛡️</div>
+        <div class="logo-icon" onclick="checkAdminTrigger()">🛡️</div>
         <span class="logo-text">SafeHer</span>
       </div>
-      <button class="btn btn-sm btn-outline" onclick="showPage('app')">Open App</button>
+      <button class="btn btn-sm btn-outline" onclick="showPage('app')">Log In</button>
     </nav>
     <div class="landing-hero">
       <div class="badge">🔒 AI-Powered Safety Navigation</div>
@@ -138,6 +179,43 @@
       <span>🚨 SOS Active — Contacts Alerted</span>
       <button class="btn btn-sm btn-danger" onclick="deactivateSOS()">Stop</button>
     </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacyModal" class="modal-overlay hidden">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Privacy Policy</h3>
+          <button class="btn btn-sm btn-glass" onclick="document.getElementById('privacyModal').classList.add('hidden')">✕</button>
+        </div>
+        <div class="modal-body" style="font-size:14px;color:var(--text2);line-height:1.5">
+          <p>Your privacy and safety are our top priority. SafeHer Route tracks your location only while the app is actively used for navigation or SOS.</p>
+          <br>
+          <p><strong>Data Deletion:</strong> You have the right to request deletion of all your data. Use the "Delete Account" button in your profile to permanently erase your records (GDPR/DPDP compliant).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <section id="admin" class="page hidden" style="padding:20px;padding-top:80px">
+      <h2 style="color:var(--primary)">Admin Dashboard</h2>
+      <p style="color:var(--text2)">System monitoring and user management.</p>
+      
+      <div class="dash-grid" style="margin-top:20px">
+        <div class="stat-card">
+          <div class="stat-value">1,402</div>
+          <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">340</div>
+          <div class="stat-label">Active Routes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--danger)">2</div>
+          <div class="stat-label">Active SOS Alerts</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:20px" onclick="showPage('app')">Exit Admin</button>
+    </section>
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">

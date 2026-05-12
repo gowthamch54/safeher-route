@@ -2,6 +2,7 @@ import '../style.css';
 import { Capacitor } from '@capacitor/core';
 import { CHENNAI_CENTER, DANGER_ZONES, SAFE_ZONES, getCrowdDensity, COMMUNITY_REPORTS } from './data/chennai-zones.js';
 import { analyzeRisk, scoreRoute } from './data/risk-model.js';
+import { initFirebase, saveToFirestore, getFromFirestore, getAuth, softDeleteDocument, logout } from './services/firebase.js';
 
 let map, heatLayer, dangerCircles = [], userMarker, sosTimer, sosActive = false, heatmapVisible = false;
 const contacts = JSON.parse(localStorage.getItem('sh_contacts') || '[]');
@@ -21,23 +22,147 @@ window.addEventListener('DOMContentLoaded', () => {
     );
     saveContacts();
   }
+
+  initApp();
 });
 
+async function initApp() {
+  const user = await initFirebase();
+  
+  if (user) {
+    document.getElementById('authSection').classList.add('hidden');
+    document.getElementById('landing').classList.remove('active');
+    document.getElementById('app').classList.add('active');
+    
+    const remoteContacts = await getFromFirestore('contacts');
+    if (remoteContacts && remoteContacts.length > 0) contacts = remoteContacts;
+    
+    initMap();
+    switchTab(document.querySelector('.nav-item.active'));
+  } else {
+    document.getElementById('landing').classList.add('active');
+    document.getElementById('app').classList.remove('active');
+  }
+
+  document.getElementById('findRouteBtn').addEventListener('click', findRoutes);
+  document.getElementById('heatmapToggle').addEventListener('click', toggleHeatmap);
+  document.getElementById('sosBtn').addEventListener('click', triggerSOS);
+}
+
 // ---- PAGE NAV ----
-window.showPage = function(page) {
+window.showPage = function(pageId) {
+  if (pageId === 'app' && (!getAuth || !getAuth().currentUser)) {
+    document.getElementById('authSection').classList.remove('hidden');
+    return;
+  }
+  
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(page).classList.add('active');
-  if (page === 'app' && !map) initMap();
+  document.getElementById(pageId).classList.add('active');
+  if(pageId === 'app') {
+    initMap();
+    switchTab(document.querySelector('.nav-item.active'));
+  }
+};
+
+// ---- AUTHENTICATION UI HANDLERS ----
+window.switchAuthTab = function(tab) {
+  document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('active'));
+  document.querySelector(`button[onclick="switchAuthTab('${tab}')"]`).classList.add('active');
+  
+  if (tab === 'email') {
+    document.getElementById('authEmail').classList.remove('hidden');
+    document.getElementById('authPhone').classList.add('hidden');
+  } else {
+    document.getElementById('authEmail').classList.add('hidden');
+    document.getElementById('authPhone').classList.remove('hidden');
+  }
+};
+
+window.handleEmailLogin = async function() {
+  const email = document.getElementById('emailInput').value;
+  const pass = document.getElementById('passwordInput').value;
+  if (!email || !pass) return alert("Enter email and password");
+  try {
+    const { loginWithEmail } = await import('./services/firebase.js');
+    await loginWithEmail(email, pass);
+    window.location.reload();
+  } catch(e) { alert("Login failed: " + e.message); }
+};
+
+window.handleEmailSignup = async function() {
+  const email = document.getElementById('emailInput').value;
+  const pass = document.getElementById('passwordInput').value;
+  if (!email || !pass) return alert("Enter email and password");
+  try {
+    const { signupWithEmail } = await import('./services/firebase.js');
+    await signupWithEmail(email, pass);
+    window.location.reload();
+  } catch(e) { alert("Signup failed: " + e.message); }
+};
+
+window.handleSendOTP = async function() {
+  const phone = document.getElementById('phoneInput').value;
+  if (!phone) return alert("Enter phone number");
+  try {
+    const { sendPhoneOTP } = await import('./services/firebase.js');
+    phoneConfirmationResult = await sendPhoneOTP(phone);
+    document.getElementById('phoneStep1').classList.add('hidden');
+    document.getElementById('phoneStep2').classList.remove('hidden');
+  } catch(e) { alert("Failed to send OTP: " + e.message); }
+};
+
+window.handleVerifyOTP = async function() {
+  const otp = document.getElementById('otpInput').value;
+  if (!otp || !phoneConfirmationResult) return alert("Enter OTP");
+  try {
+    await phoneConfirmationResult.confirm(otp);
+    window.location.reload();
+  } catch(e) { alert("Invalid OTP: " + e.message); }
+};
+
+window.handleLogout = async function() {
+  try {
+    const { logout } = await import('./services/firebase.js');
+    await logout();
+    window.location.reload();
+  } catch(e) { alert("Logout failed"); }
+};
+
+let adminClicks = 0;
+window.checkAdminTrigger = function() {
+  adminClicks++;
+  if (adminClicks >= 5) {
+    const pwd = prompt("Enter Admin Password:");
+    if (pwd === "safeher2024") {
+      showPage('admin');
+    } else {
+      alert("Unauthorized");
+    }
+    adminClicks = 0;
+  }
+};
+
+window.handleDeleteAccount = async function() {
+  if (confirm("Are you sure you want to permanently delete your account and all data? This cannot be undone (GDPR Right to Erasure).")) {
+    try {
+      const { getAuth } = await import('./services/firebase.js');
+      const user = getAuth().currentUser;
+      if (user) await user.delete();
+      window.location.reload();
+    } catch(e) {
+      alert("You need to log in again to delete your account for security reasons.");
+    }
+  }
 };
 
 // ---- MAP ----
 function initMap() {
+  if (map) return;
   map = L.map('map', { zoomControl: true, attributionControl: false }).setView(CHENNAI_CENTER, 13);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
   }).addTo(map);
 
-  // User location
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(pos => {
       const { latitude: lat, longitude: lng } = pos.coords;
@@ -47,7 +172,6 @@ function initMap() {
     }, () => {}, { enableHighAccuracy: true });
   }
 
-  // Danger zones
   DANGER_ZONES.forEach(z => {
     const c = L.circle(z.center, {
       radius: z.radius, color: z.level === 'high' ? '#EF4444' : '#F59E0B',
@@ -57,14 +181,12 @@ function initMap() {
     dangerCircles.push(c);
   });
 
-  // Safe zones
   SAFE_ZONES.forEach(z => {
     L.circle(z.center, {
       radius: z.radius, color: '#10B981', fillColor: '#10B981', fillOpacity: 0.08, weight: 1, dashArray: '5,5'
     }).addTo(map).bindPopup(`<b>✅ ${z.name}</b><br><span style="color:#94A3B8">Well-lit, active area</span>`);
   });
 
-  // Community report markers
   COMMUNITY_REPORTS.forEach(r => {
     const icon = r.type === 'danger' ? '🔴' : r.type === 'warning' ? '🟡' : '🟢';
     L.marker(r.coords, {
@@ -72,17 +194,7 @@ function initMap() {
     }).addTo(map).bindPopup(`<b>${r.location}</b><br>${r.text}<br><span style="color:#64748B">${r.time} · ${r.votes} votes</span>`);
   });
 
-  // Map click -> risk analysis
   map.on('click', e => showRiskAnalysis(e.latlng.lat, e.latlng.lng));
-
-  // Search
-  document.getElementById('searchInput').addEventListener('focus', () => {
-    document.getElementById('routePanel').classList.remove('hidden');
-  });
-
-  document.getElementById('findRouteBtn').addEventListener('click', findRoutes);
-  document.getElementById('heatmapToggle').addEventListener('click', toggleHeatmap);
-  document.getElementById('sosBtn').addEventListener('click', triggerSOS);
 }
 
 // ---- HEATMAP ----
@@ -110,7 +222,6 @@ function findRoutes() {
   const resultsDiv = document.getElementById('routeResults');
   resultsDiv.innerHTML = '<p style="text-align:center;color:var(--text2);padding:20px">🔍 Finding safest routes...</p>';
 
-  // Geocode destination using Nominatim
   fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destVal + ' Chennai')}&format=json&limit=1`)
     .then(r => r.json())
     .then(data => {
@@ -128,12 +239,10 @@ function findRoutes() {
 }
 
 function generateRoutes(origin, dest, container) {
-  // Use OSRM for routing
   const url = `https://router.project-osrm.org/route/v1/driving/${origin[1]},${origin[0]};${dest[1]},${dest[0]}?alternatives=true&overview=full&geometries=geojson`;
   fetch(url).then(r => r.json()).then(data => {
     if (!data.routes || !data.routes.length) { container.innerHTML = '<p style="color:var(--danger)">No routes found.</p>'; return; }
 
-    // Remove old route lines
     map.eachLayer(l => { if (l._safeherRoute) map.removeLayer(l); });
 
     container.innerHTML = '';
@@ -311,12 +420,27 @@ window.switchTab = function(btn) {
 function renderDashboard(panel) {
   const totalTrips = trips.length;
   const avgSafety = totalTrips ? Math.round(trips.reduce((s, t) => s + t.score, 0) / totalTrips) : 0;
+  
+  const auth = getAuth ? getAuth() : null;
+  const userText = auth?.currentUser?.phoneNumber || auth?.currentUser?.email || "User";
+
   const tripsHTML = trips.slice(0, 5).map(t => {
     const cls = t.score >= 70 ? 'safety-high' : t.score >= 40 ? 'safety-med' : 'safety-low';
     return `<div class="trip-item"><div><div class="trip-route">${t.to}</div><div class="trip-date">${t.date}</div></div><span class="trip-score ${cls}">${t.score}/100</span></div>`;
   }).join('') || '<p style="color:var(--text3);text-align:center;padding:20px">No trips yet. Start navigating!</p>';
 
   panel.innerHTML = `
+    <div class="dash-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div>
+        <h2 style="font-size:24px;margin-bottom:4px">Vanakkam, ${userText} 👋</h2>
+        <p style="color:var(--text2)">Stay safe on every journey.</p>
+      </div>
+      <button class="btn btn-glass btn-sm" onclick="handleLogout()">Logout</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:20px">
+      <button class="btn btn-glass" style="flex:1" onclick="document.getElementById('privacyModal').classList.remove('hidden')">📄 Privacy</button>
+      <button class="btn btn-danger" style="flex:1" onclick="handleDeleteAccount()">⚠️ Delete Data</button>
+    </div>
     <h2>📊 Safety Dashboard</h2>
     <div class="dash-grid">
       <div class="dash-card safe"><span class="num">${avgSafety}%</span><span class="lbl">Avg Safety Score</span></div>
@@ -373,8 +497,14 @@ window.showAddContact = function() {
       </div>
       <div class="modal-btns">
         <button class="btn btn-glass" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-        <button class="btn btn-primary" onclick="addContact()">Add Contact</button>
       </div>
+      <button class="btn btn-glass btn-sm" onclick="handleLogout()">Logout</button>
+    </div>
+
+    <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-glass" onclick="document.getElementById('privacyModal').classList.remove('hidden')">📄 Privacy Policy & Terms</button>
+      <button class="btn btn-danger" onclick="handleDeleteAccount()">⚠️ Delete Account (GDPR)</button>
+    </div>
     </div>`;
   document.body.appendChild(overlay);
 };
