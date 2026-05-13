@@ -7,6 +7,7 @@ import { initFirebase, saveToFirestore, getFromFirestore, getAuth, softDeleteDoc
 let map, heatLayer, dangerCircles = [], userMarker, sosTimer, sosActive = false, heatmapVisible = false;
 let contacts = JSON.parse(localStorage.getItem('sh_contacts') || '[]');
 let trips = JSON.parse(localStorage.getItem('sh_trips') || '[]');
+let phoneConfirmationResult = null;
 
 // ---- INIT ----
 window.addEventListener('DOMContentLoaded', () => {

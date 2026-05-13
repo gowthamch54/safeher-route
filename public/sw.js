@@ -1,4 +1,4 @@
-const CACHE_NAME = 'safeher-v1';
+const CACHE_NAME = 'safeher-v3';
 const ASSETS = ['/', '/index.html', '/style.css', '/src/main.js'];
 
 self.addEventListener('install', e => {
