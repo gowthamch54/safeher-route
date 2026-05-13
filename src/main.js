@@ -101,8 +101,16 @@ window.handleEmailSignup = async function() {
 };
 
 window.handleSendOTP = async function() {
-  const phone = document.getElementById('phoneInput').value;
+  let phone = document.getElementById('phoneInput').value.trim();
   if (!phone) return alert("Enter phone number");
+  
+  // Auto-prepend +91 for Indian numbers if user forgets
+  if (phone.length === 10 && !phone.startsWith('+')) {
+    phone = '+91' + phone;
+  } else if (!phone.startsWith('+')) {
+    phone = '+' + phone;
+  }
+
   try {
     const { sendPhoneOTP } = await import('./services/firebase.js');
     phoneConfirmationResult = await sendPhoneOTP(phone);
