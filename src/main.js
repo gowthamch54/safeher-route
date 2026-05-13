@@ -105,19 +105,18 @@ window.handleSendOTP = async function() {
   let phone = document.getElementById('phoneInput').value.trim();
   if (!phone) return alert("Enter phone number");
   
-  // Auto-prepend +91 for Indian numbers if user forgets
-  if (phone.length === 10 && !phone.startsWith('+')) {
-    phone = '+91' + phone;
-  } else if (!phone.startsWith('+')) {
-    phone = '+' + phone;
-  }
+  if (phone.length === 10 && !phone.startsWith('+')) phone = '+91' + phone;
+  else if (!phone.startsWith('+')) phone = '+' + phone;
 
-  try {
-    const { sendPhoneOTP } = await import('./services/firebase.js');
-    phoneConfirmationResult = await sendPhoneOTP(phone);
-    document.getElementById('phoneStep1').classList.add('hidden');
-    document.getElementById('phoneStep2').classList.remove('hidden');
-  } catch(e) { alert("Failed to send OTP: " + e.message); }
+  // HACKATHON BYPASS: Fake the SMS sending to avoid Firebase Billing Errors
+  phoneConfirmationResult = {
+    confirm: async (otp) => {
+      if (otp !== '123456') throw new Error("Invalid OTP. Try 123456");
+      return { user: { uid: 'mock_phone_user', phoneNumber: phone } };
+    }
+  };
+  document.getElementById('phoneStep1').classList.add('hidden');
+  document.getElementById('phoneStep2').classList.remove('hidden');
 };
 
 window.handleVerifyOTP = async function() {
@@ -125,7 +124,10 @@ window.handleVerifyOTP = async function() {
   if (!otp || !phoneConfirmationResult) return alert("Enter OTP");
   try {
     await phoneConfirmationResult.confirm(otp);
-    window.location.reload();
+    // Fake successful login for UI purposes
+    document.getElementById('authSection').classList.add('hidden');
+    showPage('app');
+    alert("Login successful! Welcome.");
   } catch(e) { alert("Invalid OTP: " + e.message); }
 };
 
