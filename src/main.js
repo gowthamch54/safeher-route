@@ -5,6 +5,8 @@ import { analyzeRisk, scoreRoute } from './data/risk-model.js';
 import { initFirebase, saveToFirestore, getFromFirestore, getAuth, softDeleteDocument, logout } from './services/firebase.js';
 
 let map, heatLayer, dangerCircles = [], userMarker, sosTimer, sosActive = false, heatmapVisible = false;
+let routeStrategy = 'safety'; // 'safety' or 'speed'
+let dmsTimer = null, dmsTimeRemaining = 300, isDisguised = false, recognition = null;
 let contacts = JSON.parse(localStorage.getItem('sh_contacts') || '[]');
 let trips = JSON.parse(localStorage.getItem('sh_trips') || '[]');
 let phoneConfirmationResult = null;
@@ -266,7 +268,11 @@ function generateRoutes(origin, dest, container) {
       return { route, coords, safety, dist, dur, index: i };
     });
 
-    scored.sort((a, b) => b.safety.score - a.safety.score);
+    if (routeStrategy === 'safety') {
+      scored.sort((a, b) => b.safety.score - a.safety.score); // Highest safety first
+    } else {
+      scored.sort((a, b) => a.dur - b.dur); // Lowest duration first
+    }
 
     scored.forEach((s, idx) => {
       const polyCoords = s.route.geometry.coordinates.map(c => [c[1], c[0]]);
@@ -377,34 +383,131 @@ function activateSOS() {
   sosActive = true;
   document.getElementById('sosActive').classList.remove('hidden');
   document.getElementById('sosBtn').style.display = 'none';
-  // Vibrate
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
   
-  // Trigger phone call
   const emergencyNumber = contacts.length > 0 ? contacts[0].phone : '112';
   
-  if (Capacitor.isNativePlatform() && window.plugins && window.plugins.CallNumber) {
-    // Native Android: Bypass dialer completely
-    window.plugins.CallNumber.callNumber(
-      () => console.log('Direct call initiated'),
-      (err) => console.log('Direct call failed:', err),
-      emergencyNumber,
-      true // true = bypassAppChooser (direct call)
-    );
-  } else {
-    // Web Fallback: Open dial pad
-    window.location.href = `tel:${emergencyNumber}`;
+  // Real GPS Fetch & WhatsApp sharing
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+      const msg = encodeURIComponent(`🚨 URGENT SOS! I am in danger. Here is my live location: ${mapsLink}`);
+      
+      // Attempt to open WhatsApp
+      window.location.href = `whatsapp://send?text=${msg}`;
+      
+      // Alert fallback if WhatsApp fails
+      setTimeout(() => alert(`🚨 SOS Triggered!\n\nCalling: ${emergencyNumber}\nLocation: ${lat}, ${lng}\n\n(WhatsApp opened in background)`), 1500);
+    }, () => {
+      alert("Could not get GPS location. Sending SOS without location.");
+    }, { enableHighAccuracy: true });
   }
-
-  // Alert popup
-  const names = contacts.map(c => c.name).join(', ');
-  setTimeout(() => alert(`🚨 SOS Alert Triggered!\n\nCalling: ${contacts.length > 0 ? contacts[0].name : 'Emergency Services'} (${emergencyNumber})\nYour live location is being shared.`), 1000);
 }
 
 window.deactivateSOS = function() {
   sosActive = false;
   document.getElementById('sosActive').classList.add('hidden');
   document.getElementById('sosBtn').style.display = 'flex';
+};
+
+// ---- TOOLKIT & STRATEGY LOGIC ----
+window.setRouteStrategy = function(strategy) {
+  routeStrategy = strategy;
+  document.querySelectorAll('.strategy-label').forEach(el => el.classList.remove('active'));
+  document.getElementById(strategy === 'safety' ? 'strategySafety' : 'strategySpeed').classList.add('active');
+  if (document.getElementById('destInput').value.trim()) findRoutes();
+};
+
+window.toggleToolkit = () => document.getElementById('toolkitDrawer').classList.toggle('hidden');
+
+// Fake Call
+let fakeCallAudio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-classic-telephone-ring-1350.mp3');
+fakeCallAudio.loop = true;
+window.triggerFakeCall = function() {
+  document.getElementById('toolkitDrawer').classList.add('hidden');
+  document.getElementById('fakeCallOverlay').classList.remove('hidden');
+  fakeCallAudio.play().catch(e => console.log('Audio autoplay blocked'));
+};
+window.acceptFakeCall = function() {
+  fakeCallAudio.pause();
+  document.getElementById('acceptCallBtn').style.display = 'none';
+  // Play conversational audio or just keep it silent
+};
+window.declineFakeCall = function() {
+  fakeCallAudio.pause();
+  document.getElementById('fakeCallOverlay').classList.add('hidden');
+  document.getElementById('acceptCallBtn').style.display = 'block';
+};
+
+// Dead Man's Switch (DMS)
+window.startDMS = function() {
+  document.getElementById('toolkitDrawer').classList.add('hidden');
+  document.getElementById('dmsOverlay').classList.remove('hidden');
+  dmsTimeRemaining = 300; // 5 mins
+  updateDMSDisplay();
+  dmsTimer = setInterval(() => {
+    dmsTimeRemaining--;
+    updateDMSDisplay();
+    if (dmsTimeRemaining <= 0) {
+      cancelDMS();
+      triggerSOS(); // Trigger actual SOS!
+    }
+  }, 1000);
+};
+function updateDMSDisplay() {
+  const m = Math.floor(dmsTimeRemaining / 60).toString().padStart(2, '0');
+  const s = (dmsTimeRemaining % 60).toString().padStart(2, '0');
+  document.getElementById('dmsTimer').textContent = `${m}:${s}`;
+}
+window.cancelDMS = function() {
+  clearInterval(dmsTimer);
+  document.getElementById('dmsOverlay').classList.add('hidden');
+};
+
+// Disguise Mode (Dark stealth screen)
+window.toggleDisguise = function() {
+  isDisguised = !isDisguised;
+  if (isDisguised) {
+    document.body.style.filter = 'brightness(0.3) grayscale(1)';
+    document.getElementById('map').style.opacity = '0';
+    document.getElementById('toolkitDrawer').classList.add('hidden');
+  } else {
+    document.body.style.filter = '';
+    document.getElementById('map').style.opacity = '1';
+  }
+};
+
+// Voice Trigger SOS
+window.toggleVoiceSOS = function() {
+  const btn = document.getElementById('voiceSosBtn');
+  if (recognition) {
+    recognition.stop();
+    recognition = null;
+    btn.textContent = '🎤 Voice SOS: OFF';
+    return;
+  }
+  
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return alert("Voice recognition not supported in this browser.");
+  
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  
+  recognition.onresult = (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript.toLowerCase();
+      if (transcript.includes('help safe') || transcript.includes('help me safe')) {
+        recognition.stop();
+        triggerSOS();
+      }
+    }
+  };
+  recognition.onend = () => { if (recognition) recognition.start(); }; // Keep listening
+  recognition.start();
+  btn.textContent = '🎤 Voice SOS: ON (Say "Help SafeHer")';
+  btn.style.color = 'var(--danger)';
 };
 
 // ---- TAB SWITCHING ----

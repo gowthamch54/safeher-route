@@ -238,6 +238,12 @@ a{color:var(--accent);text-decoration:none}
 .auth-input{padding:14px 16px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:var(--radius);color:var(--text);font-size:15px;outline:none;transition:border-color 0.2s}
 .auth-input:focus{border-color:var(--primary)}
 
+/* Route Strategy Toggle */
+.route-strategy { display: flex; gap: 8px; margin-bottom: 15px; }
+.strategy-label { flex: 1; text-align: center; padding: 10px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--transition); color: var(--text2); }
+.strategy-label.active { background: rgba(16, 185, 129, 0.15); border-color: var(--safe); color: var(--safe); }
+#strategySpeed.active { background: rgba(6, 182, 212, 0.15); border-color: var(--accent); color: var(--accent); }
+
 /* Mobile adjustments */
 @media(max-width:480px){
   .landing-hero{padding:40px 16px 30px}
